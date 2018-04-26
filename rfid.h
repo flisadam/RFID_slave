@@ -12,7 +12,7 @@
 #ifndef RFID_H_
 #define RFID_H_
 
-extern volatile uint64_t RFID_data;
+extern volatile uint8_t RFID_data[8];
 
 // flaga = 1 - informuje, ¿e odebrany zosta³ nowy kod z pilota
 extern volatile uint8_t RFID_decoded_flag;

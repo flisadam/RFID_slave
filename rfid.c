@@ -10,7 +10,7 @@
 #include <util/delay.h>
 #include "rfid.h"
 
-volatile uint64_t RFID_data;//zmienna globalna przechowuj¹ca ostatnio odebrane 64 bity danych
+volatile uint8_t RFID_data[8];//zmienna globalna przechowuj¹ca ostatnio odebrane 64 bity danych
 //volatile uint64_t RFID_data2;
 volatile uint8_t RFID_decoded_flag;//flaga ustawiana w celu sygnalizacji odebrania ramki
 
@@ -43,12 +43,67 @@ w przeciwnym wypadku fukcja zwraca 0
 //z RFID_DATA nie daje rady-nawet jak wpisze na sztywno
 // jak do ifa wpisze sie na sztywno bity to dzia³a
 uint8_t header_align(){
+PORTB ^= (1<<PORTB1);
 	// wchodzi z dobrze zapisanymi danymi i wywala b³¹d..
-uint16_t RFID_data1=0b1110111111111010;//101010101010100101010101010101010110101010110110;
-		 //			0b1100000000000000000000000000000000000000000000000000000000000000
-	//PORTA ^= (1<<PORTA2);
+static uint8_t left_ones[8];
+static uint8_t right_ones[8];
+uint8_t rbit=0b00000001;//bit tymczasowy
+uint8_t lbit=0b10000000;
+//
+//RFID_data[0]=0b00001111;
+//RFID_data[1]=0b11110000;
+//RFID_data[2]=0b00001111; wektory testowe
+//RFID_data[3]=0b11110000;
+//RFID_data[4]=0b00011111;
+//RFID_data[5]=0b11110000;
+//RFID_data[6]=0b00001111;
+//RFID_data[7]=0b11110000;
+	for (int i=0; i<8;i++)
+	{
+		lbit=	0b10000000;
+		rbit =	0b00000001;
+		right_ones[i]=0;
+		left_ones[i]=0;
+		
+		while ((RFID_data[i]&rbit)==rbit)
+		{
+			rbit= rbit<<1;
+			right_ones[i]++;
+		}
+		while ((RFID_data[i]&lbit)==lbit)
+		{
+			lbit= lbit>>1;
+			left_ones[i]++;
+		}
+	}
+for (int j=0;j<8;j++)
+{
+	if (j==7)
+	{
+			if (right_ones[j]+left_ones[0]==6)
+			{
+				//PORTA ^= (1<<PORTA2);
+				return 1;
+			}
+	}
+	else
+	{
+		
+			if (right_ones[j]+left_ones[j+1]==6)
+			{
+				//PORTA ^= (1<<PORTA2);
+				return 1;
+			}
+			
+	}
+}
+return 0;
+}// dziala-sprawdza 9 jedynek kolo siebie i je 
 	
-	uint8_t mbit=1;//bit tymczasowy
+
+	
+/*	
+	
 	for(uint8_t i=0;i<64;i++){//maksymalnie mo¿emy obróciæ ca³¹ ramkê - 64 bity
 		if((RFID_data1&SBIT_MASK)==SBIT_MASK){//sprawdzamy czy ramka jest OK
 //PORTB ^= (1<<PORTB1);//nie spelnia warunku
@@ -71,7 +126,10 @@ PORTA ^= (1<<PORTA2);
 	}//jeœli nadal nie mamy headeru to ramka by³a b³êdna
 	//PORTB ^= (1<<PORTB1);//- tu co 40ms jest wywalony blad
 	return 0;
-}
+	
+	*/
+	
+
 
 /*
 szybkie obliczanie even parity dla czterech bitów
@@ -106,7 +164,7 @@ i przy okazji ³¹czy 4-ro bitowe fragmenty danych w pe³ne bajty
 uint8_t h_parity(){
 	
 	//PORTA ^= (1<<PORTA2);
-	uint8_t ok=1,hbyte=0;
+/*	uint8_t ok=1,hbyte=0;
 	for(uint8_t i=0;i<10;i++){
 		uint8_t par_c,par_r;
 		hbyte=(RFID_data&((uint64_t)D10_MASK)<<(i*5))>>(D10_SHIFT+(i*5));//œci¹gamy po³ówkê bajtu
@@ -122,13 +180,13 @@ uint8_t h_parity(){
 			RFID_id[i/2]|=hbyte<<4;
 		}
 	}
-	
-	return ok;//zwracamy czy parzystoœæ siê zgadza
+*/	
+	return 1;//ok;//zwracamy czy parzystoœæ siê zgadza
 }
 
 
 uint8_t v_parity(){//obliczamy bit parzystoœci pionowej
-	for(uint8_t i=0;i<4;i++){
+/*	for(uint8_t i=0;i<4;i++){
 		uint8_t vpar_c=0;
 		uint8_t vpar_r;
 		for(uint8_t j=0;j<5;j++){//obliczamy na podstawie po³¹czonych bajtów
@@ -140,7 +198,7 @@ uint8_t v_parity(){//obliczamy bit parzystoœci pionowej
 		if(vpar_r!=vpar_c){//sprawdzamy - pierwszy b³¹d i nie ma sensu sprawdzaæ dalej
 			return 0;
 		}
-	}
+	}*/
 	return 1;
 }
 
@@ -157,6 +215,8 @@ uint8_t v_parity(){//obliczamy bit parzystoœci pionowej
 
 ISR(TIMER2_CAPT_vect)
 {
+	PORTB ^= (1<<PORTB1);
+	
 	//PORTB ^= (1<<PORTB1);
 	//PORTA ^= (1<<PORTA2);
 	static uint16_t LastICR;//ostatnia wartoœæ przechwycenia
@@ -164,17 +224,24 @@ ISR(TIMER2_CAPT_vect)
 	static uint8_t  BitCt;//licznik bitów odebranych
 	static uint8_t  BitVal;//wartoœæ aktualnie przetwarzanego bitu
 	uint8_t  decode_ok;//zmienna tymczasowa pomagaj¹ca obs³ugiwaæ kontrolê poprawnoœci danych
-	static uint8_t RFID_tmp;//tymczasowa zmienna do której zapisywane s¹ kolejno odbierane bity
-
+	static uint8_t RFID_tmp[8];//tymczasowa zmienna do której zapisywane s¹ kolejno odbierane bity
+	static uint8_t point;
 	PulseWidth = ICR2- LastICR;//szerokoœæ impulsu
 	LastICR=ICR2;//zapisujemy dane tego zbocza
-
+	static uint8_t  header_finder;
+	if (test_flag==0)
+{
 	TCCR2B ^= (1<<ICES2);//zmiana zbocza wyzwalaj¹cego na przeciwne
 	//licznik++;
 	if(EdgeCt == 0){//jeœli system dekodowania zosta³ wyzerowany
 		BitCt=0;//resetujemy wszystkie zmienne
 		BitVal=1;
-		RFID_tmp=0;
+		point =0;
+		header_finder=0;
+		for (int i=0;i<8;i++)
+		{
+			*(RFID_tmp + i)=0;// zerujemy cala tablice
+		}
 		//PORTA ^= (1<<PORTA2);
 	}
 
@@ -182,56 +249,72 @@ ISR(TIMER2_CAPT_vect)
 		EdgeCt=0;
 		//PORTA ^= (1<<PORTA2);
 		}else if(PulseWidth >= MIN_HALF_BIT && PulseWidth <= MAX_HALF_BIT){//impuls krótki (1/2 CLK)
-	
+			
 			//PORTA ^= (1<<PORTA2);
 		//licznik= SPI_SlaveTransmit(130);
 		if(EdgeCt % 2  == 0){//jeœli to parzyste zbocze
-			RFID_tmp<<=1;//to zapisujemy bit
+			//RFID_tmp[point]<<=1;//to zapisujemy bit
+			header_finder++;
 			//if (BitVal==1) PORTA ^= (1<<PORTA2);// test iloœci jedynek
 			//else PORTB ^= (1<<PORTB1);			// test iloœci zer
-			RFID_tmp|=(uint64_t)BitVal;
-			BitCt++;//i zwiêkszamy licznik odebranych bitów
+			//RFID_tmp[point]|=BitVal;
+			//BitCt++;//i zwiêkszamy licznik odebranych bitów
 			
 		}
 		EdgeCt++;//zwiêkszamy licznik zbocz
 		}else{//przeciwny wypadek - (PulseWidth > MAX_HALF_BIT && PulseWidth < MAX_BIT)
 				//PORTA ^= (1<<PORTA2);
+				header_finder=0;
 		//czyli d³ugi impuls (1 CLK)
 		//licznik= SPI_SlaveTransmit(131);
-		BitVal^=0x01;//zmieniamy wartoœæ aktualnie przetwarzanego bitu
-		RFID_tmp<<=1;//i zapisujemy bit
+		//BitVal^=0x01;//zmieniamy wartoœæ aktualnie przetwarzanego bitu
+		//RFID_tmp[point]<<=1;//i zapisujemy bit
 		//if (BitVal==1) PORTA ^= (1<<PORTA2);	// test iloœci jedynek
 		//else PORTB ^=(1<<PORTB1);				// test iloœci zer
 	
-		RFID_tmp|=(uint64_t)BitVal;
+		RFID_tmp[point]|=BitVal;
 		BitCt++;//i zwiêkszamy licznik odebranych bitów
 		EdgeCt+=2;//i zwiêkszamy licznik zbocz o 2 (dla porz¹dku)
 	}
-	
+	if (BitCt % 8) point++;
+	if (point> 7) point =0;
 	//PORTA |= (1<<PORTA2);
 // wywoluje siê co 64 przerwanie- i blokuje przerwania na 4.5ms
 	//jeœli odebraliœmy ca³¹ ramkê/// to trwa 4.5ms i wywo³ujê siê co 33,7 ms- 
+		}
+		if(header_finder==8) PORTA ^= (1<<PORTA2);
 	if(BitCt>64){
-		//PORTB ^= (1<<PORTB1);
+		
+	//	for (int i=0; i<8; i++)
+	//	{
+	//		*(RFID_data+i)=*(RFID_tmp+i);
+	//	}
+	//	PORTA ^= (1<<PORTA2);
+	//	if (*(RFID_tmp+0)>10) 
+	//	PORTB ^= (1<<PORTB1);
+		test_flag=1;
 		//_delay_ms(1);
 		EdgeCt=0;//resetujemy system do odbioru kolejnej
 		//RFID_decoded_flag=0;
 		if (RFID_decoded_flag == 0) {//i jeœli poprzednie dekodowanie zosta³o odebrane w programie
-			RFID_data=RFID_tmp;//to zapisujemy ramkê w formacie niezdekodowanym
+				for (int i=0; i<8; i++)
+				{
+					*(RFID_data+i)=*(RFID_tmp+i);
+				}
 			//PORTB ^= (1<<PORTB1);
-			decode_ok=header_align();//i dekodujemy j¹
+			//decode_ok=header_align();//i dekodujemy j¹
 			//licznik++;
-			if(decode_ok)decode_ok=h_parity();
-			if(decode_ok)decode_ok=v_parity();
-			if(!decode_ok){//jeœli dekodowanie posz³o nie tak jak trzeba
-				RFID_data=~RFID_data;//to negujemy ramkê (mo¿e zaczêliœmy dekodowanie od niew³aœciwego zbocza)
-				decode_ok=header_align();//i ponawiamy próbê dekodowania
-				if(decode_ok)decode_ok=h_parity();
-				if(decode_ok)decode_ok=v_parity();
+		//	if(decode_ok)decode_ok=h_parity();
+		//	if(decode_ok)decode_ok=v_parity();
+		//	if(!decode_ok){//jeœli dekodowanie posz³o nie tak jak trzeba
+		//		RFID_data=~RFID_data;//to negujemy ramkê (mo¿e zaczêliœmy dekodowanie od niew³aœciwego zbocza)
+		//		decode_ok=header_align();//i ponawiamy próbê dekodowania
+		//		if(decode_ok)decode_ok=h_parity();
+		//		if(decode_ok)decode_ok=v_parity();
 			//	PORTB |= (1<<PORTB1);
 			}
-			RFID_decoded_flag=decode_ok;//i przypisujemy fladze to czy zdekodowano poprawnie ramkê, czy nie
-		}
+		//	RFID_decoded_flag=decode_ok;//i przypisujemy fladze to czy zdekodowano poprawnie ramkê, czy nie
+		//}
 	}
 	//PORTA ^= (1<<PORTA2);
 }
