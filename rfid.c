@@ -9,11 +9,15 @@
 #include <avr/interrupt.h>
 #include <util/delay.h>
 #include "rfid.h"
-
-volatile uint8_t RFID_data[8];//zmienna globalna przechowuj¹ca ostatnio odebrane 64 bity danych
+#define BIT_MASK 0b1111111110000000000000000000000000000000000000000000000000000000ULL
+uint64_t bit_mask=0b1111111110000000000000000000000000000000000000000000000000000000;
+uint64_t RFID_data;//zmienna globalna przechowuj¹ca ostatnio odebrane 64 bity danych
 //volatile uint64_t RFID_data2;
+///static uint8_t  EdgeCt;//licznik zbocz
+// static uint8_t  BitCt;//licznik bitów odebranych
+// static uint8_t  BitVal;//wartoœæ aktualnie przetwarzanego bitu
 volatile uint8_t RFID_decoded_flag;//flaga ustawiana w celu sygnalizacji odebrania ramki
-
+volatile uint8_t PW_read_flag;
 volatile uint8_t RFID_id[5];//tablica w której zapisywane s¹ zdekodowane dane
 volatile uint16_t PulseWidth;
 volatile uint8_t licznik=0;
@@ -42,7 +46,7 @@ w przeciwnym wypadku fukcja zwraca 0
 */
 //z RFID_DATA nie daje rady-nawet jak wpisze na sztywno
 // jak do ifa wpisze sie na sztywno bity to dzia³a
-uint8_t header_align(){
+/*uint8_t header_align(){
 PORTB ^= (1<<PORTB1);
 	// wchodzi z dobrze zapisanymi danymi i wywala b³¹d..
 static uint8_t left_ones[8];
@@ -100,34 +104,37 @@ for (int j=0;j<8;j++)
 return 0;
 }// dziala-sprawdza 9 jedynek kolo siebie i je 
 	
-
+*/
 	
-/*	
 	
-	for(uint8_t i=0;i<64;i++){//maksymalnie mo¿emy obróciæ ca³¹ ramkê - 64 bity
-		if((RFID_data1&SBIT_MASK)==SBIT_MASK){//sprawdzamy czy ramka jest OK
-//PORTB ^= (1<<PORTB1);//nie spelnia warunku
-PORTA ^= (1<<PORTA2);
+uint8_t header_align(){
+	uint8_t mbit;
+	for(uint8_t i=0;i<64;i++){
+		//PORTA ^= (1<<PORTA2);
+		//maksymalnie mo¿emy obróciæ ca³¹ ramkê - 64 bity
+		if((RFID_data&bit_mask)==bit_mask){
+//PORTA ^= (1<<PORTA2);
 			return 1;//jeœli tak to przerywamy dzia³anie
 			//break;
-		}//jeœli ramka nie jest ok
-		if(RFID_data1&MBIT_MASK)
+		}
+	//	PORTA ^= (1<<PORTA2);//jeœli ramka nie jest ok
+		if(RFID_data&MBIT_MASK)
 		{
 			mbit=1;
-			//PORTB ^= (1<<PORTB1);
+			//PORTA ^= (1<<PORTA2);
+		//	PORTB ^= (1<<PORTB1);
 		}
 		else mbit=0;//sprawdzamy najwy¿szy bit
-		RFID_data1=RFID_data1<<1;//przesówamy ramkê o 1 bit w lewo
-		if(mbit)RFID_data1|=LBIT_MASK;//dopisujemy wczeœniejszy najwy¿szy bit na koniec
+		RFID_data=RFID_data<<1;//przesówamy ramkê o 1 bit w lewo
+		//if(mbit) RFID_data3|=lbit_mask;//dopisujemy wczeœniejszy najwy¿szy bit na koniec
 	}
-	if((RFID_data1&SBIT_MASK)==SBIT_MASK){//sprawdzamy po ostatnim przesuniêciu
-		//PORTB ^= (1<<PORTB1);// nie spelnia warunku
+	if((RFID_data&bit_mask)==bit_mask){//sprawdzamy po ostatnim przesuniêciu
+	//PORTA ^= (1<<PORTA2);
 		return 1;
 	}//jeœli nadal nie mamy headeru to ramka by³a b³êdna
-	//PORTB ^= (1<<PORTB1);//- tu co 40ms jest wywalony blad
 	return 0;
-	
-	*/
+	}
+
 	
 
 
@@ -161,10 +168,10 @@ uint8_t parity_cal(uint8_t value){
 funkcja sprawdza parzystoœæ poziom¹ (P0-P9)
 i przy okazji ³¹czy 4-ro bitowe fragmenty danych w pe³ne bajty
 */
-uint8_t h_parity(){
+uint8_t h_parity(uint64_t data){
 	
 	//PORTA ^= (1<<PORTA2);
-/*	uint8_t ok=1,hbyte=0;
+	uint8_t ok=1,hbyte=0;
 	for(uint8_t i=0;i<10;i++){
 		uint8_t par_c,par_r;
 		hbyte=(RFID_data&((uint64_t)D10_MASK)<<(i*5))>>(D10_SHIFT+(i*5));//œci¹gamy po³ówkê bajtu
@@ -180,13 +187,13 @@ uint8_t h_parity(){
 			RFID_id[i/2]|=hbyte<<4;
 		}
 	}
-*/	
+	
 	return 1;//ok;//zwracamy czy parzystoœæ siê zgadza
 }
 
 
 uint8_t v_parity(){//obliczamy bit parzystoœci pionowej
-/*	for(uint8_t i=0;i<4;i++){
+	for(uint8_t i=0;i<4;i++){
 		uint8_t vpar_c=0;
 		uint8_t vpar_r;
 		for(uint8_t j=0;j<5;j++){//obliczamy na podstawie po³¹czonych bajtów
@@ -198,7 +205,7 @@ uint8_t v_parity(){//obliczamy bit parzystoœci pionowej
 		if(vpar_r!=vpar_c){//sprawdzamy - pierwszy b³¹d i nie ma sensu sprawdzaæ dalej
 			return 0;
 		}
-	}*/
+	}
 	return 1;
 }
 
@@ -213,7 +220,46 @@ uint8_t v_parity(){//obliczamy bit parzystoœci pionowej
 // przerwanie bez zliczania ca³ej ramki trwa 24 us
 // wywoluje sie co 276 us-
 
-ISR(TIMER2_CAPT_vect)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ISR(TIMER2_CAPT_vect)// zbocze opadajace to "1"
+{
+	//PORTB ^= (1<<PORTB1);
+	static uint16_t LastICR;//ostatnia wartoœæ przechwycenia
+	
+	
+	PulseWidth = ICR2- LastICR;//szerokoœæ impulsu
+	
+	LastICR=ICR2;//zapisujemy dane tego zbocza
+	
+	TCCR2B ^= (1<<ICES2);//zmiana zbocza wyzwalaj¹cego na przeciwne
+	
+	PW_read_flag=1;
+	
+}
+
+
+
+
+
+
+
+
+/*ISR(TIMER2_CAPT_vect)
 {
 	PORTB ^= (1<<PORTB1);
 	
@@ -285,13 +331,13 @@ ISR(TIMER2_CAPT_vect)
 		if(header_finder==8) PORTA ^= (1<<PORTA2);
 	if(BitCt>64){
 		
-	//	for (int i=0; i<8; i++)
-	//	{
-	//		*(RFID_data+i)=*(RFID_tmp+i);
-	//	}
-	//	PORTA ^= (1<<PORTA2);
-	//	if (*(RFID_tmp+0)>10) 
-	//	PORTB ^= (1<<PORTB1);
+		for (int i=0; i<8; i++)
+		{
+			*(RFID_data+i)=*(RFID_tmp+i);
+		}
+		PORTA ^= (1<<PORTA2);
+		if (*(RFID_tmp+0)>10) 
+		PORTB ^= (1<<PORTB1);
 		test_flag=1;
 		//_delay_ms(1);
 		EdgeCt=0;//resetujemy system do odbioru kolejnej
@@ -302,25 +348,25 @@ ISR(TIMER2_CAPT_vect)
 					*(RFID_data+i)=*(RFID_tmp+i);
 				}
 			//PORTB ^= (1<<PORTB1);
-			//decode_ok=header_align();//i dekodujemy j¹
+			decode_ok=header_align();//i dekodujemy j¹
 			//licznik++;
-		//	if(decode_ok)decode_ok=h_parity();
-		//	if(decode_ok)decode_ok=v_parity();
-		//	if(!decode_ok){//jeœli dekodowanie posz³o nie tak jak trzeba
-		//		RFID_data=~RFID_data;//to negujemy ramkê (mo¿e zaczêliœmy dekodowanie od niew³aœciwego zbocza)
-		//		decode_ok=header_align();//i ponawiamy próbê dekodowania
-		//		if(decode_ok)decode_ok=h_parity();
-		//		if(decode_ok)decode_ok=v_parity();
+			if(decode_ok)decode_ok=h_parity();
+			if(decode_ok)decode_ok=v_parity();
+			if(!decode_ok){//jeœli dekodowanie posz³o nie tak jak trzeba
+				//RFID_data=~RFID_data;//to negujemy ramkê (mo¿e zaczêliœmy dekodowanie od niew³aœciwego zbocza)
+				decode_ok=header_align();//i ponawiamy próbê dekodowania
+				if(decode_ok)decode_ok=h_parity();
+				if(decode_ok)decode_ok=v_parity();
 			//	PORTB |= (1<<PORTB1);
 			}
 		//	RFID_decoded_flag=decode_ok;//i przypisujemy fladze to czy zdekodowano poprawnie ramkê, czy nie
 		//}
 	}
 	//PORTA ^= (1<<PORTA2);
+	}
 }
 
-
-
+*/
 
 
 
