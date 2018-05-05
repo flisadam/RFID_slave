@@ -10,7 +10,7 @@
 #define SOFTSPI_H_
 
 #include <avr/io.h>
-#include <util/delay.h>
+//#include <util/delay.h>
 #include <avr/interrupt.h>
 #define SMISO PORTA0
 #define SMOSI PORTA1

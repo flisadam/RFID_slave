@@ -8,11 +8,11 @@
 //#define  F_CPU 4000000UL
 #include <avr/io.h>
 #include <avr/interrupt.h>
-#include <util/delay.h>
+//#include <util/delay.h>
 #ifndef RFID_H_
 #define RFID_H_
 
-extern uint64_t RFID_data;
+extern volatile uint64_t RFID_data;
 
 // flaga = 1 - informuje, ¿e odebrany zosta³ nowy kod z pilota
 extern volatile uint8_t RFID_decoded_flag;

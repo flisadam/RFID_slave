@@ -45,6 +45,8 @@ void InitHardSPI (void)
 		DDRA |= (1<<MISO);
 		/* Enable SPI */
 		SPCR |= (1<<SPE); //enable SPI
+		SPCR |= (1<<CPOL);
+		SPCR |=(1<<CPHA);
 		//SPCR |= (1<< SPIE); // causes SPI interrupt to be executed if SPIF is set
 		//SPDR ='x';
 }

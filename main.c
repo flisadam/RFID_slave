@@ -9,7 +9,7 @@
 //#define F_CPU   4000000UL
 
 #include <avr/io.h>
-#include <util/delay.h>
+//#include <util/delay.h>
 #include <avr/interrupt.h>
 #include "SoftSPI.h"
 #include "rfid.h"
@@ -25,13 +25,13 @@
 
 
 //uint8_t volatile RFID_ID [5];
-extern uint64_t RFID_data;
-extern volatile uint16_t PulseWidth;
+extern volatile uint64_t RFID_data;
+//extern volatile uint16_t PulseWidth;
 extern volatile uint8_t test_flag;
 extern volatile uint8_t PW_read_flag;
-static uint8_t  EdgeCt;//licznik zbocz
-static uint8_t  BitCt;//licznik bitów odebranych
-static uint8_t  BitVal;//wartoœæ aktualnie przetwarzanego bitu
+//static uint8_t  EdgeCt;//licznik zbocz
+//static uint8_t  BitCt;//licznik bitów odebranych
+//static uint8_t  BitVal;//wartoœæ aktualnie przetwarzanego bitu
 static uint8_t header_finder;
 
 int main(void)
@@ -46,42 +46,36 @@ int main(void)
 	rfid_start_read_tag();
 	RFID_init();
 	sei();
-	uint64_t RFID_data1=	0b0000000000000000000000000000000000100000000000000011111111100000;
-	uint64_t RFID_tmp=0;
-	uint8_t decode_ok=0;
+//	uint64_t RFID_data1=	0b0000000000000000000000000000000000100000000000000011111111100000;
+//	uint64_t RFID_tmp=0;
+//	uint8_t decode_ok=0;
 	RFID_decoded_flag=0;
-
+//cli();
     while (1) 
     {
-	/*	while (RFID_decoded_flag==1)
-		{
-			if(!(PINA & (1<<PORTA7)))//sprawdz czy CS ma niskie stan
-		{
-				//	header_finder=SPI_SlaveTransmit(RFID_id[0]);
-					//header_finder=SPI_SlaveTransmit(RFID_id[1]);
-					//header_finder=SPI_SlaveTransmit(RFID_id[2]);
-					//header_finder=SPI_SlaveTransmit(RFID_id[3]);
-					//header_finder=SPI_SlaveTransmit(RFID_id[4]);
-									header_finder=SPI_SlaveTransmit(1);
-									header_finder=SPI_SlaveTransmit(2);
-									header_finder=SPI_SlaveTransmit(3);
-									header_finder=SPI_SlaveTransmit(4);
-									header_finder=SPI_SlaveTransmit(5);
-					
-					RFID_decoded_flag=0;
-		}
 
-		}*/
-	
 	if (RFID_decoded_flag) {
-				header_finder=SPI_SlaveTransmit(RFID_id[0]);
-				header_finder=SPI_SlaveTransmit(RFID_id[1]);
-				header_finder=SPI_SlaveTransmit(RFID_id[2]);
-				header_finder=SPI_SlaveTransmit(RFID_id[3]);
-				header_finder=SPI_SlaveTransmit(RFID_id[4]);
+    cli();
+					header_finder=SPI_SlaveTransmit(9);
+					header_finder=SPI_SlaveTransmit(RFID_id[0]);
+					header_finder=SPI_SlaveTransmit(RFID_id[1]);
+					header_finder=SPI_SlaveTransmit(RFID_id[2]);
+					header_finder=SPI_SlaveTransmit(RFID_id[3]);
+					header_finder=SPI_SlaveTransmit(RFID_id[4]);
+					//RFID_id[0]=0;
+	sei();
 	RFID_decoded_flag=0;
 	}
-		if (PW_read_flag==1)
+		
+	
+	
+	//}
+	}
+	
+	
+	
+	
+		/*if (PW_read_flag==1 && RFID_decoded_flag==0)
 		{
 			//test();
 			//PORTA &=~ (1<<PORTA2);
@@ -156,9 +150,9 @@ int main(void)
 		}
 
 	
-		 
+		 */
     }
-
+//}
 
 							
 							
