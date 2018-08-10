@@ -19,6 +19,7 @@ extern volatile uint8_t RFID_decoded_flag;
 extern volatile uint8_t test_flag;
 extern volatile uint8_t RFID_id[5];
 extern volatile uint16_t PulseWidth;
+uint16_t gen_crc16(const uint8_t *data, uint16_t size);
 #define SBIT_MASK  0b1111111110000000000000000000000000000000000000000000000000000000 // 0b1111111110000000000000000000000000000000000000000000000000000000
 #define MBIT_MASK  0b1000000000000000000000000000000000000000000000000000000000000000
 #define LBIT_MASK  0b0000000000000000000000000000000000000000000000000000000000000001
@@ -85,14 +86,6 @@ extern volatile uint16_t PulseWidth;
 #define CP4_MASK   0b0000000000000000000000000000000000000000000000000000000000000010
 #define CP4_SHIFT  1
 
-/*
-//taktowanie z sygna³u CLK uk³adu EM4095
-#define TOLERANCE 10
-#define MIN_HALF_BIT 	32 - TOLERANCE
-#define MAX_HALF_BIT 	32 + TOLERANCE
-#define MAX_BIT         64 + TOLERANCE
-*/
-//taktowanie z preskalera timera
 #define T2_PRESCALER 8
 
 #define T_TOLERANCE     10
@@ -106,8 +99,6 @@ extern volatile uint16_t PulseWidth;
 #define MAX_BIT         ((F_CPU*(T_MAX_BIT     ))/T2_PRESCALER)/125000 
 
 
-
-// deklaracje funkcji dla u¿ytkownika
 
 uint8_t header_align();
 
